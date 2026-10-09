@@ -8,10 +8,9 @@ try {
  const ctx=await browser.newContext({viewport:{width:390,height:844}});
  const page=await ctx.newPage(); const errors=[]; const requests=[];
  page.on('pageerror',e=>errors.push(e.message)); page.on('request',r=>requests.push({url:r.url(),method:r.method()}));
- await page.goto(base); await page.getByRole('button',{name:'Încarcă captura',exact:true}).waitFor({timeout:5000});
- await page.getByRole('button',{name:'Scrie sau lipește lista'}).click();
- await page.getByLabel('Produse, unul pe rând').fill('Lapte 2 l\nOuă 10 buc\nRoșii 1,5 kg');
- await page.getByRole('button',{name:'Adaugă în listă',exact:true}).click();
+ await page.goto(base); await page.getByLabel('Captură sau mesaj').waitFor({timeout:5000});
+ await page.getByLabel('Captură sau mesaj').fill('Lapte 2 l\nOuă 10 buc\nRoșii 1,5 kg');
+ await page.getByRole('button',{name:'Fă lista',exact:true}).click();
  assert.equal(await page.locator('#pending-list .item-toggle').count(),3);
  await page.getByRole('button',{name:'Pune în coș: Lapte 2 l',exact:true}).click();
  assert.equal(await page.locator('#pending-list .item-toggle').count(),2);
@@ -41,17 +40,17 @@ try {
    return c.toDataURL('image/png').split(',')[1];
   },dark);
   const path=`.artifacts/whatsapp-synthetic-${dark?'dark':'light'}.png`;await writeFile(path,Buffer.from(fixture,'base64'));
-  await page.getByRole('button',{name:'Încarcă captura',exact:true}).click();
   await page.locator('#screenshot').setInputFiles(path);
-  await page.getByRole('button',{name:'Citește captura',exact:true}).click();
-  await page.getByLabel('Produse, unul pe rând').waitFor();
-  await page.waitForFunction(()=>document.querySelector('#read-image').disabled===false && document.querySelector('#review-text').value.length>0,{},{timeout:120000});
-  const text=await page.getByLabel('Produse, unul pe rând').inputValue();
+  await page.locator('#preview-section').waitFor();
+  await page.getByRole('button',{name:'Fă lista',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#read-image').disabled===false && document.querySelector('#pending-list').children.length>=4,{},{timeout:120000});
+  const text=await page.locator('#pending-list').innerText();
   console.log('REAL OCR',dark?'dark':'light',JSON.stringify(text));
   assert.match(text,/Lapte 2 l/i); assert.match(text,/Ou[ăa] 10 buc/i); assert.match(text,/Ro[șs]ii 1,5 kg/i); assert.match(text,/P[âa]ine integral[ăa]/i);
-  // Crop/reset affordances are available, and caller reviews chat headers before importing.
-  await page.getByLabel('Produse, unul pe rând').fill('Lapte 2 l\nOuă 10 buc\nRoșii 1,5 kg\nPâine integrală');
-  await page.getByRole('button',{name:'Adaugă în listă',exact:true}).click();
+  // OCR may retain contact names; user can delete them with the existing edit affordance.
+  if(await page.getByRole('button',{name:'Editează: Andreea',exact:true}).count()) {
+   await page.getByRole('button',{name:'Editează: Andreea',exact:true}).click();await page.getByRole('button',{name:'Șterge',exact:true}).click();
+  }
   assert.equal(await page.locator('#pending-list .item-toggle').count(),4);
   if (!dark) {await page.getByRole('button',{name:'Listă nouă',exact:true}).click();await page.getByRole('button',{name:'Începe lista nouă',exact:true}).click();}
  }

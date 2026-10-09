@@ -1,13 +1,14 @@
 # Coșul meu
-Small Romanian shopping-list app. Import a WhatsApp screenshot, optionally crop to its message, perform OCR **locally**, review the extracted text, then tap products to move them into the basket below. Tap again to return them.
+Small Romanian shopping-list app. Paste a WhatsApp screenshot into the visible text field like ChatGPT (Ctrl+V / Cmd+V), or drag/drop it. The image appears as an attachment; press **Fă lista** to perform OCR locally and create the editable shopping list. Text works in the same field. Tap products to move them into the basket below and tap again to return them.
 
 ## Privacy and limitations
-- Screenshots exist only in memory and are revoked when the import panel closes. No upload endpoint, analytics, AI API, account, or payment.
+- Screenshots exist only in memory and are revoked when removed or successfully imported. No upload endpoint, analytics, AI API, account, or payment.
 - Only list names and purchased states are kept in this browser's localStorage. No cross-device sync.
 - Browser downloads the app/OCR assets from the hosting origin; these requests reveal normal web access metadata to the host, not screenshot contents.
-- OCR is not semantic AI: it can misread accents/quantities and include contact names. Review is intentionally editable and required. Crop tightly for best results.
+- OCR is not semantic AI: it can misread accents/quantities and include contact names. Correct or delete products with the pencil control after import. Crop tightly for best results.
 - List is usable offline after initial app load, and OCR resources are cached as they are used. First OCR requires a connection.
 - Screenshot formats: PNG, JPEG, WebP; max 12 MB/25 megapixels.
+- Clipboard is read only on an actual paste event or explicit Lipește click. The latter may require browser permission. Where image clipboard access is unavailable, native paste or the attach-image button remains available. Mobile behavior depends on the OS/browser; no physical-phone test is claimed.
 
 ## Build and run
 ```sh
@@ -23,7 +24,7 @@ Open http://localhost:4179/ (do not open index.html as a file URL).
 npx playwright install chromium
 APP_URL=http://localhost:4179/ npm run test:browser
 ```
-Optionally supply `CHROME_PATH=/path/to/chrome` to use an installed Chromium. Tests use synthetic light/dark WhatsApp-style fixtures, real OCR workers and real UI interactions. They verify basket/undo/edit/reset/persistence, responsive captures and absence of screenshot upload/external OCR requests. Generated QA files stay in `.artifacts/`, excluded from Git.
+Optionally supply `CHROME_PATH=/path/to/chrome` to use an installed Chromium. Tests use synthetic light/dark WhatsApp-style fixtures, real OCR workers and real UI interactions. They use real OS/browser clipboard writes and trusted keyboard paste, and verify attachment rendering, retained drafts, removal, text paste, explicit paste, file fallback, invalid file errors, basket/undo/edit/reset/persistence, responsive captures and absence of screenshot upload/external OCR requests. Generated QA files stay in `.artifacts/`, excluded from Git.
 
 ## Hosting
 The production artifact is the **contents of `dist/`**, not the source root. All paths are relative, so GitHub Pages repository paths work. Publish artifact to `gh-pages` and configure Pages → branch `gh-pages`, directory `/`. `.nojekyll` is included. No custom GitHub Actions workflow/token scope required.

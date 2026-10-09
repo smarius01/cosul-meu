@@ -4,7 +4,7 @@ const STORAGE='cosul-meu:list:v1';
 const appBase=new URL('../',import.meta.url);
 let items=[]; let storageOk=true;
 try {items=readSaved(localStorage.getItem(STORAGE));} catch {storageOk=false;}
-let editId=null, previewUrl=null, crop=null, drag=null, busy=false, worker=null, job=0, timer=null, libraryPromise=null;
+let editId=null, previewUrl=null, crop=null, drag=null, busy=false, worker=null, job=0, timer=null, libraryPromise=null, attachmentJob=0;
 function icon(name) {const image=document.createElement('img');image.src=new URL(`icons/${name}.svg`,appBase).href;image.className='icon';image.alt='';return image;}
 function tell(message, error=false) {$('status').textContent=message;$('status').classList.toggle('error',error);}
 function save() {
@@ -38,48 +38,62 @@ function render() {
  $('pending-count').textContent=pendingCount;$('basket-count').textContent=basketCount;
  $('pending-empty').hidden=pendingCount>0;$('basket-empty').hidden=basketCount>0;
  $('empty-title').textContent=items.length?'Totul este în coș':'Începe cu lista ta';
- $('empty-description').textContent=items.length?'Ai luat toate produsele de pe listă.':'Încarcă o captură sau lipește mesajul de pe WhatsApp.';
+ $('empty-description').textContent=items.length?'Ai luat toate produsele de pe listă.':'Lipește captura sau mesajul în câmpul de mai sus.';
  $('restore-all').hidden=basketCount===0;$('new-list').hidden=items.length===0;
 }
-function updateReview() {const count=parseList($('review-text').value).length;$('review-count').textContent=count?`${count} ${count===1?'produs':'produse'}.`:'';}
 function setBusy(value) {
- busy=value;for(const id of ['read-image','change-image','reset-crop','choose-file'])$(id).disabled=value;
- $('ocr-progress').hidden=!value;$('review-text').disabled=value;
- $('review-form').querySelector('button[type=submit]').disabled=value;
+ busy=value;for(const id of ['read-image','reset-crop','choose-file','paste-image','remove-image'])$(id).disabled=value;
+ $('ocr-progress').hidden=!value;$('review-text').disabled=value;$('read-image').textContent=value?'Citesc captura…':'Fă lista';
 }
-function stopOcr(message='Citirea a fost oprită. Poți încerca din nou.') {
+function stopOcr(message='Citirea a fost oprită. Captura și textul sunt păstrate; poți încerca din nou.') {
  job++;clearTimeout(timer);timer=null;
  if(worker){worker.terminate().catch(()=>{});worker=null;}
  setBusy(false);$('import-error').textContent=message;
 }
 function releasePreview() {
- if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=null;$('preview-image').removeAttribute('src');$('screenshot').value='';crop=null;
- $('crop-selection').hidden=true;$('preview-section').hidden=true;$('choose-file').hidden=false;
+ attachmentJob++;if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=null;$('preview-image').removeAttribute('src');$('screenshot').value='';crop=null;drag=null;
+ $('crop-selection').hidden=true;$('preview-section').hidden=true;
 }
-function closeImport() {if(busy)stopOcr('');$('import-panel').hidden=true;releasePreview();$('review-text').value='';$('review-form').hidden=true;$('import-error').textContent='';}
-function openImport(mode) {
- closeImport();$('import-panel').hidden=false;$('image-controls').hidden=mode==='text';
- $('import-title').textContent=mode==='text'?'Din mesajul tău':'Din captura ta';
- $('review-form').hidden=mode!=='text';$('review-text').value='';updateReview();
- $('import-panel').scrollIntoView({block:'nearest',behavior:'auto'});
- if(mode==='text')$('review-text').focus({preventScroll:true});
+function closeImport() {if(busy)stopOcr('');releasePreview();$('review-text').value='';$('import-error').textContent='';}
+function importLabels(labels) {
+ if(!labels.length){$('import-error').textContent='Nu am găsit produse. Lipește o captură mai clară sau scrie lista în câmp.';return false;}
+ const old=items.length;items=mergeItems(items,labels);save();render();closeImport();
+ tell(items.length>old?'Lista este gata. Verifică denumirile și cantitățile; creionul le modifică.':'Produsele sunt deja pe listă.');
+ $('pending').scrollIntoView({block:'start',behavior:'auto'});return true;
 }
-$('open-image').addEventListener('click',()=>openImport('image'));
-$('open-text').addEventListener('click',()=>openImport('text'));
-$('close-import').addEventListener('click',closeImport);$('cancel-review').addEventListener('click',closeImport);
-for(const id of ['choose-file','change-image'])$(id).addEventListener('click',()=>$('screenshot').click());
-$('screenshot').addEventListener('change',async event=>{
- const file=event.target.files?.[0];if(!file)return;
- $('import-error').textContent='';
+async function attachImage(file) {
+ if(busy)return;$('import-error').textContent='';
  if(!['image/png','image/jpeg','image/webp'].includes(file.type)){$('import-error').textContent='Alege o captură PNG, JPG sau WebP.';return;}
  if(file.size>12*1024*1024){$('import-error').textContent='Imaginea depășește 12 MB. Decupează captura din galeria telefonului.';return;}
- releasePreview();previewUrl=URL.createObjectURL(file);const image=$('preview-image');image.src=previewUrl;
+ releasePreview();const current=++attachmentJob;previewUrl=URL.createObjectURL(file);const image=$('preview-image');image.src=previewUrl;
  try {
-  await image.decode();
+  await image.decode();if(current!==attachmentJob)return;
   if(image.naturalWidth*image.naturalHeight>25000000)throw new Error('oversize');
-  $('preview-section').hidden=false;$('choose-file').hidden=true;$('review-form').hidden=true;$('review-text').value='';
- } catch(error) {releasePreview();$('import-error').textContent=error.message==='oversize'?'Captura este prea mare. Decupează zona cu lista din galerie.':'Nu am putut deschide imaginea. Încearcă o captură PNG sau JPG.';}
+  $('preview-section').hidden=false;tell('Captura este atașată. Apasă „Fă lista”.');
+ } catch(error) {if(current!==attachmentJob)return;releasePreview();$('import-error').textContent=error.message==='oversize'?'Captura este prea mare. Decupează zona cu lista din galerie.':'Nu am putut deschide imaginea. Încearcă o captură PNG sau JPG.';}
+}
+$('choose-file').addEventListener('click',()=>$('screenshot').click());
+$('screenshot').addEventListener('change',event=>{const file=event.target.files?.[0];if(file)void attachImage(file);});
+$('remove-image').addEventListener('click',()=>{releasePreview();tell('Captura a fost eliminată. Textul este păstrat.');$('review-text').focus({preventScroll:true});});
+document.addEventListener('paste',event=>{
+ if(event.target.closest?.('dialog')||event.target.id==='new-item')return;
+ const image=[...(event.clipboardData?.items||[])].find(item=>item.kind==='file'&&item.type.startsWith('image/'))?.getAsFile()
+  ||[...(event.clipboardData?.files||[])].find(file=>file.type.startsWith('image/'));
+ if(!image)return;event.preventDefault();if(busy){tell('Așteaptă să se termine citirea sau oprește-o.',true);return;}void attachImage(image);
 });
+$('paste-image').addEventListener('click',async()=>{
+ if(!navigator.clipboard?.read){$('review-text').focus();$('import-error').textContent='Folosește Ctrl+V / ⌘V în câmp sau ține apăsat și alege Lipire. Poți și atașa captura.';return;}
+ try {
+  const clipboard=await navigator.clipboard.read();
+  for(const item of clipboard){const type=item.types.find(t=>t.startsWith('image/'));if(type){await attachImage(await item.getType(type));return;}}
+  const textItem=clipboard.find(i=>i.types.includes('text/plain'));
+  if(textItem){const text=await(await textItem.getType('text/plain')).text();$('review-text').focus();$('review-text').setRangeText(text,$('review-text').selectionStart,$('review-text').selectionEnd,'end');$('import-error').textContent='';return;}
+  $('import-error').textContent='Nu este o captură sau un text în clipboard. Copiază imaginea și încearcă din nou.';
+ }catch{$('review-text').focus();$('import-error').textContent='Browserul nu a permis citirea clipboardului. Folosește Ctrl+V / ⌘V sau Lipire în câmp; atașarea din galerie rămâne disponibilă.';}
+});
+$('composer').addEventListener('dragover',event=>{if(event.dataTransfer?.types.includes('Files')){event.preventDefault();$('composer').classList.add('dragover');}});
+$('composer').addEventListener('dragleave',event=>{if(!$('composer').contains(event.relatedTarget))$('composer').classList.remove('dragover');});
+$('composer').addEventListener('drop',event=>{const file=event.dataTransfer?.files?.[0];$('composer').classList.remove('dragover');if(file){event.preventDefault();void attachImage(file);}});
 function point(event) {const rect=$('preview-image').getBoundingClientRect();return {x:Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height))};}
 function drawCrop() {
  const selection=$('crop-selection');selection.hidden=!crop;if(!crop)return;
@@ -110,8 +124,10 @@ function prepareImage() {
  for(let i=0;i<pixels.data.length;i+=4){let value=.299*pixels.data[i]+.587*pixels.data[i+1]+.114*pixels.data[i+2];if(invert)value=255-value;pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=value;}
  ctx.putImageData(pixels,0,0);return canvas;
 }
-$('read-image').addEventListener('click',async()=>{
- if(busy||!previewUrl)return;const current=++job;setBusy(true);$('review-form').hidden=true;$('import-error').textContent='';$('progress').value=0;$('ocr-label').textContent='Pregătesc citirea pe telefon… Prima dată durează puțin mai mult.';
+$('review-form').addEventListener('submit',async event=>{
+ event.preventDefault();if(busy)return;const draft=$('review-text').value;
+ if(!previewUrl){importLabels(parseList(draft));return;}
+ const current=++job;setBusy(true);$('import-error').textContent='';$('progress').value=0;$('ocr-label').textContent='Pregătesc citirea pe telefon… Prima dată durează puțin mai mult.';
  timer=setTimeout(()=>{if(current===job)stopOcr('Citirea durează prea mult. Decupează doar mesajul cu lista sau lipește textul.');},90000);
  try {
   const t=await loadLibrary();if(current!==job)return;
@@ -124,14 +140,11 @@ $('read-image').addEventListener('click',async()=>{
   if(current!==job){await created.terminate();return;}worker=created;
   await created.setParameters({tessedit_pageseg_mode:t.PSM.AUTO,user_defined_dpi:'150'});
   const result=await created.recognize(prepareImage());if(current!==job)return;
-  const text=parseList(result.data.text).join('\n');$('review-text').value=text;updateReview();$('review-form').hidden=false;
-  if(!text)$('import-error').textContent='Nu am găsit text lizibil. Decupează zona cu lista și încearcă din nou, sau scrie produsele mai jos.';
-  $('review-form').scrollIntoView({block:'nearest',behavior:'auto'});
- } catch {if(current===job){$('import-error').textContent='Nu am putut citi captura. Verifică internetul la prima utilizare, încearcă decuparea sau lipește mesajul.';$('review-form').hidden=false;}}
+  const labels=[...parseList(result.data.text),...parseList(draft)];importLabels(labels);
+ } catch {if(current===job){$('import-error').textContent='Nu am putut citi captura. Textul și captura sunt păstrate. Încearcă decuparea sau scrie produsele în câmp.';}}
  finally {if(current===job){clearTimeout(timer);setBusy(false);if(worker){worker.terminate().catch(()=>{});worker=null;}}}
 });
-$('cancel-ocr').addEventListener('click',()=>stopOcr());$('review-text').addEventListener('input',updateReview);
-$('review-form').addEventListener('submit',event=>{event.preventDefault();if(busy)return;const labels=parseList($('review-text').value);if(!labels.length){$('import-error').textContent='Adaugă cel puțin un produs, pe un rând separat.';return;}const old=items.length;items=mergeItems(items,labels);save();render();closeImport();tell(items.length>old?'Produsele sunt pe listă. Atinge-le pe măsură ce le iei.':'Produsele sunt deja pe listă.');$('pending').scrollIntoView({block:'start',behavior:'auto'});});
+$('cancel-ocr').addEventListener('click',()=>stopOcr());
 $('add-form').addEventListener('submit',event=>{event.preventDefault();const label=$('new-item').value.trim();if(!label)return;const old=items.length;items=mergeItems(items,[label]);save();render();$('new-item').value='';tell(items.length>old?`${label} a fost adăugat.`:'Produsul este deja pe listă.');});
 $('edit-form').addEventListener('submit',event=>{event.preventDefault();const label=$('edit-label').value.trim();if(!label)return;items=items.map(i=>i.id===editId?{...i,label}:i);save();render();$('edit-dialog').close();tell('Produsul a fost modificat.');});
 $('cancel-edit').addEventListener('click',()=>$('edit-dialog').close());
