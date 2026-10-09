@@ -1,7 +1,20 @@
 const key = value => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('ro').replace(/\s+/g,' ').trim();
+function expandEssenceContext(text) {
+ // Bounded shared-category inference, not an LLM: inherit only named essence
+ // flavors directly adjacent to an explicit essence. Do not cross messages,
+ // unrelated products, alternatives, or an independently quantified bottle.
+ const flavor='(?:vanilie|rom|migdale|l[ăa]m[âa]ie|portocale|ment[ăa])';
+ const run=new RegExp(`(\\besen[țt](?:[ăa]|e)[ \\t]+de[ \\t]+(${flavor}))((?:[ \\t]*,[ \\t]*(?:de[ \\t]+)?${flavor}(?=[ \\t]*(?:[,;\\r\\n.!?]|$)))+)`,'giu');
+ return text.replace(run,(match,head,first,tail,offset)=>{
+  const quantified=/\d+[ \t]*$/u.test(text.slice(0,offset));
+  const labels=[quantified?head:`esență de ${first.toLocaleLowerCase('ro')}`];
+  for(const name of tail.split(',').filter(s=>s.trim()))labels.push(`esență de ${name.trim().replace(/^de[ \t]+/iu,'').toLocaleLowerCase('ro')}`);
+  return labels.join(', ');
+ });
+}
 export function parseList(text) {
  const seen=new Set();
- return String(text).replace(/(?<!\d),|,(?!\d)|;/g,'\n').split(/\r?\n/).map(line => line
+ return expandEssenceContext(String(text)).replace(/(?<!\d),|,(?!\d)|;/g,'\n').split(/\r?\n/).map(line => line
   .replace(/^\s*(?:[•●▪◦*+\-–—]\s*|\d+[.)](?=\s|[^\d\s])\s*)/u,'')
   .replace(/^\s*(?:lista(?: de)? cump[ăa]r[ăa]turi|lista de cump[ăa]r[ăa]turi|cump[ăa]r[ăa]turi|ia te rog|te rog(?: s[ăa])? (?:iei|cumperi)|de cump[ăa]rat)\s*:\s*/iu,'')
   .replace(/\s*\b\d{1,2}:\d{2}\s*(?:[✓✔√]+)?\s*$/u,'')
