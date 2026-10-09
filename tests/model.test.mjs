@@ -25,6 +25,9 @@ test('invalid saved data recovers safely rather than breaking page', () => {
 test('normalizes a pipe misread as liters only after a numeric quantity', () => {
  assert.deepEqual(parseList('Lapte 2 |\nApă 1,5 |\nBrânză | maturată'), ['Lapte 2 l','Apă 1,5 l','Brânză | maturată']);
 });
+test('preserves decimal quantities at the beginning and end of a product line', () => {
+ assert.deepEqual(parseList('1.5 kg făină\nLapte 1.50\n1. Pâine'), ['1.5 kg făină','Lapte 1.50','Pâine']);
+});
 test('blank lines, timestamps and headers do not become products', () => {
  assert.deepEqual(parseList('\n14:32\nAzi\nCumpărături\n\n'),[]);
 });
