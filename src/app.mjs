@@ -1,4 +1,4 @@
-import { parseList, mergeItems, toggleItem, readSaved } from './model.mjs';
+import { parseList, parseOcrList, mergeItems, toggleItem, readSaved } from './model.mjs';
 const $ = id => document.getElementById(id);
 const STORAGE='cosul-meu:list:v1';
 const appBase=new URL('../',import.meta.url);
@@ -139,8 +139,8 @@ $('review-form').addEventListener('submit',async event=>{
   });
   if(current!==job){await created.terminate();return;}worker=created;
   await created.setParameters({tessedit_pageseg_mode:t.PSM.AUTO,user_defined_dpi:'150'});
-  const result=await created.recognize(prepareImage());if(current!==job)return;
-  const labels=[...parseList(result.data.text),...parseList(draft)];importLabels(labels);
+  const result=await created.recognize(prepareImage(),{}, {text:true,blocks:true});if(current!==job)return;
+  const labels=[...parseOcrList(result.data),...parseList(draft)];importLabels(labels);
  } catch {if(current===job){$('import-error').textContent='Nu am putut citi captura. Textul și captura sunt păstrate. Încearcă decuparea sau scrie produsele în câmp.';}}
  finally {if(current===job){clearTimeout(timer);setBusy(false);if(worker){worker.terminate().catch(()=>{});worker=null;}}}
 });
