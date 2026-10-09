@@ -5,7 +5,8 @@ try{const p=await browser.newPage();const requests=[],errors=[];p.on('request',r
 const base=process.env.APP_URL||'http://127.0.0.1:4179/';await p.goto(base);await p.locator('#screenshot').setInputFiles(source);await p.locator('#preview-section').waitFor();await p.getByRole('button',{name:'Fă lista',exact:true}).click();
 await p.waitForFunction(()=>document.querySelector('#pending-list').children.length>0&&!document.querySelector('#read-image').disabled,{},{timeout:120000});
 const raw=await p.locator('.item-label').allTextContents();const labels=raw.map(x=>x.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase());
-assert.ok(labels.includes('6 cutii mici de icre'),JSON.stringify(raw));assert.ok(labels.includes('esente de vanilie'),JSON.stringify(raw));
+assert.ok(labels.includes('6 cutii mici de icre'),JSON.stringify(raw));assert.ok(labels.includes('esenta de vanilie'),JSON.stringify(raw));
+assert.ok(labels.includes('esenta de rom'),JSON.stringify(raw));assert.ok(!labels.includes('rom'),JSON.stringify(raw));
 assert.ok(labels.some(x=>x.includes('6 mezeluri')&&x.includes('sau salam')),JSON.stringify(raw));
 assert.ok(labels.some(x=>x.includes('hartie igienica')&&x.includes('munca')),JSON.stringify(raw));
 assert.ok(labels.some(x=>x.includes('babybell')&&x.includes('dalea rulate asa')),JSON.stringify(raw));
