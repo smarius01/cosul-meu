@@ -1,0 +1,1 @@
+{"schemaVersion":1,"mode":"operate","fonts":{"body":"system-ui"},"colors":{"background":"#f5f7f6","surface":"#ffffff","text":"#18251f","muted":"#56665d","accent":"#176448","border":"#dce4df"},"radii":{"control":"12px","row":"14px","panel":"18px"},"layout":{"maxWidth":"720px","mobileGutter":"16px"},"motion":{"duration":"120ms","reducedMotion":true}}
