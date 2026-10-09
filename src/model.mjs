@@ -2,9 +2,9 @@ const key = value => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLower
 export function parseList(text) {
  const seen=new Set();
  return String(text).replace(/(?<!\d),|,(?!\d)|;/g,'\n').split(/\r?\n/).map(line => line
-  .replace(/^\s*(?:[•●▪◦*+\-–—]|\d+[.)])\s*/u,'')
+  .replace(/^\s*(?:[•●▪◦*+\-–—]\s*|\d+[.)](?=\s|[^\d\s])\s*)/u,'')
   .replace(/^\s*(?:lista(?: de)? cump[ăa]r[ăa]turi|lista de cump[ăa]r[ăa]turi|cump[ăa]r[ăa]turi|ia te rog|te rog(?: s[ăa])? (?:iei|cumperi)|de cump[ăa]rat)\s*:\s*/iu,'')
-  .replace(/\s*\b\d{1,2}[:.]\d{2}\s*(?:[✓✔√]+)?\s*$/u,'')
+  .replace(/\s*\b\d{1,2}:\d{2}\s*(?:[✓✔√]+)?\s*$/u,'')
   .replace(/[✓✔√]+$/u,'').trim()
   .replace(/(\d+(?:[,.]\d+)?)\s*\|$/u,'$1 l')
  ).filter(line => {
